@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+@theme inline {
+  /* Colors from Figma Spec */
+  --color-primary: #363CD5;
+  --color-primary-active: #1718BF;
+  --color-primary-ghost: #E0E0FF;
+  --color-background: #F7F9FC;
+  --color-surface: #FBF8FF;
+  --color-text-primary: #1B1B24;
+  --color-text-secondary: #585E71;
+  --color-border: #F3F4F6;
+  
+  /* Attendance Card Colors */
+  --color-card-blue-bg: #DDE2F8;
+  --color-card-red-bg: #FFDAD6;
+  --color-card-red-text: #93000A;
+  --color-card-orange-bg: #FFDBCF;
+  --color-card-orange-text: #722100;
+
+  /* Typography */
+  --font-sans: var(--font-plus-jakarta-sans), system-ui, sans-serif;
+
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure minimum touch target for mobile */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
