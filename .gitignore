@@ -25,6 +25,9 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+next-env.d.ts
+.next/
+out/
 
 # Python
 __pycache__/
