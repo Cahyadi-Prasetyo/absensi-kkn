@@ -11,7 +11,7 @@ function BrandLogo() {
         <circle cx="12" cy="16" r="10" fill="#363CD5" fillOpacity="0.85" />
         <circle cx="20" cy="16" r="10" fill="#60A5FA" fillOpacity="0.75" />
       </svg>
-      <span className="font-extrabold text-[20px] text-[#0F172A] tracking-tight">Portal KKN</span>
+      <span className="font-extrabold text-[20px] text-[#0F172A] tracking-tight">Portal Absensi</span>
     </div>
   );
 }
