@@ -1,7 +1,11 @@
-"use client";
-
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { AbsenProps, HistoryItem } from "./AbsenMobile";
+
+const Scanner = dynamic(
+  () => import("@yudiel/react-qr-scanner").then((mod) => mod.Scanner),
+  { ssr: false }
+);
 
 // Logo brand mirip HoomanRD (dua lingkaran bertumpuk transparan)
 function BrandLogo() {
@@ -35,6 +39,7 @@ function Avatar({ className = "w-8 h-8" }: { className?: string }) {
 
 export default function AbsenDesktop(props: AbsenProps) {
   const [activeTab, setActiveTab] = useState<"home" | "history" | "profile">("home");
+  const [isScanning, setIsScanning] = useState(false);
   
   // Local filter states for history tab
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,47 +54,41 @@ export default function AbsenDesktop(props: AbsenProps) {
                           item.status.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "All" || 
                           (statusFilter === "Valid" && item.status === "valid") ||
-                          (statusFilter === "Late" && item.status === "telat") ||
-                          (statusFilter === "Out of Radius" && item.status === "luar_radius");
+                          (statusFilter === "Late" && item.status === "telat");
     return matchesSearch && matchesStatus;
   });
 
-  // Dynamic values based on Employee Statistic time filter selection
-  const statValues = {
-    "7days": {
-      presence: "5 Days",
-      presenceBadge: "↗ 2% Month",
+  // Dynamically calculate statistics from historyList based on active timeFilter
+  const getStatsForRange = (filter: "7days" | "30days" | "All") => {
+    const nowTime = new Date();
+    const daysToFilter = filter === "7days" ? 7 : filter === "30days" ? 30 : 999999;
+    
+    const filtered = props.historyList.filter(item => {
+      if (filter === "All") return true;
+      const itemDate = new Date(item.rawDate);
+      const diffTime = Math.abs(nowTime.getTime() - itemDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= daysToFilter;
+    });
+
+    const presenceCount = filtered.length;
+    const validCount = filtered.filter(item => item.status === "valid").length;
+    const lateCount = filtered.filter(item => item.status === "telat").length;
+
+    return {
+      presence: `${presenceCount} Hari`,
+      presenceBadge: filter === "7days" ? "Terbaru" : filter === "30days" ? "30 Hari Terakhir" : "Seluruh Waktu",
       presenceBadgeColor: "text-[#10B981] bg-emerald-50 border-emerald-100",
-      today: "28",
-      todayBadge: "↗ 4% Month",
+      today: `${validCount} Hari`,
+      todayBadge: "Tepat Waktu",
       todayBadgeColor: "text-[#10B981] bg-emerald-50 border-emerald-100",
-      notPresent: "00",
-      notPresentBadge: "0% Change",
-      notPresentBadgeColor: "text-slate-400 bg-slate-50 border-slate-200/60"
-    },
-    "30days": {
-      presence: "15 Days",
-      presenceBadge: "↗ 8% Month",
-      presenceBadgeColor: "text-[#10B981] bg-emerald-50 border-emerald-100",
-      today: "30",
-      todayBadge: "↘ 2% Month",
-      todayBadgeColor: "text-[#EF4444] bg-rose-50 border-rose-100",
-      notPresent: "03",
-      notPresentBadge: "↗ 3% Month",
-      notPresentBadgeColor: "text-[#EF4444] bg-rose-50 border-rose-100"
-    },
-    "All": {
-      presence: "45 Days",
-      presenceBadge: "↗ 12% Overall",
-      presenceBadgeColor: "text-[#10B981] bg-emerald-50 border-emerald-100",
-      today: "29",
-      todayBadge: "↗ 1% Overall",
-      todayBadgeColor: "text-[#10B981] bg-emerald-50 border-emerald-100",
-      notPresent: "08",
-      notPresentBadge: "↗ 5% Overall",
-      notPresentBadgeColor: "text-[#EF4444] bg-rose-50 border-rose-100"
-    }
-  }[timeFilter];
+      notPresent: `${lateCount} Hari`,
+      notPresentBadge: "Terlambat",
+      notPresentBadgeColor: lateCount > 0 ? "text-[#EF4444] bg-rose-50 border-rose-100" : "text-slate-400 bg-slate-50 border-slate-200/60"
+    };
+  };
+
+  const statValues = getStatsForRange(timeFilter);
 
   return (
     <div className="hidden lg:flex min-h-screen bg-[#F8FAFC] w-full flex-row relative font-sans antialiased text-slate-800">
@@ -142,18 +141,20 @@ export default function AbsenDesktop(props: AbsenProps) {
         </div>
 
         {/* Profile Card Summary at Bottom */}
-        <div className="flex items-center justify-between border-t border-[#E5E7EB] pt-4 select-none">
+        <div className="flex flex-col gap-4 border-t border-[#E5E7EB] pt-4 select-none">
           <div className="flex items-center gap-3">
             <Avatar className="w-9 h-9" />
             <div className="flex flex-col text-left">
               <span className="font-bold text-[13px] text-slate-800 leading-tight">{props.studentName}</span>
-              <span className="text-[11px] text-slate-400">@cahyadi</span>
+              <span className="text-[11px] text-slate-400">@mahasiswa</span>
             </div>
           </div>
-          <button className="text-slate-400 hover:text-slate-600 cursor-pointer">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 10.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM12 4.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM12 16.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
-            </svg>
+          <button
+            type="button"
+            onClick={props.handleLogout}
+            className="w-full py-2.5 rounded-xl border border-rose-200 bg-rose-50/20 hover:bg-rose-50 text-rose-600 font-bold text-[11px] uppercase tracking-[0.5px] cursor-pointer transition-all text-center"
+          >
+            Keluar Sistem
           </button>
         </div>
       </aside>
@@ -197,32 +198,75 @@ export default function AbsenDesktop(props: AbsenProps) {
                     </div>
                     <span className="font-bold text-[16px] text-slate-800 tracking-tight">Check In</span>
                   </div>
-
-                  {/* Clean scanner target area */}
-                  <div className="w-full aspect-[4/3] bg-[#F8FAFC] border-2 border-dashed border-slate-200 rounded-[20px] flex flex-col items-center justify-center gap-3 select-none p-4">
-                    <svg className="w-10 h-10 text-[#94A3B8]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="3" y="3" width="6" height="6" rx="1.5" />
-                      <rect x="15" y="3" width="6" height="6" rx="1.5" />
-                      <rect x="3" y="15" width="6" height="6" rx="1.5" />
-                      <path d="M15 15h2v2h-2zm2 2h2v2h-2zm0-2h2v2h-2z" />
-                    </svg>
-                    <span className="font-semibold text-[13px] text-slate-500">Scan QR Code to Check In</span>
-                    {props.isCheckedIn && (
-                      <span className="text-[11px] font-bold text-success uppercase tracking-[0.5px]">Success: {props.currentTime}</span>
+                             {/* Clean scanner target area */}
+                  <div className="w-full aspect-[4/3] bg-[#F8FAFC] border-2 border-dashed border-slate-200 rounded-[20px] flex flex-col items-center justify-center gap-3 select-none p-4 overflow-hidden relative">
+                    {props.isCheckedIn ? (
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2">
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                        <span className="font-bold text-[14px] text-slate-800">Absensi Hari Ini Selesai</span>
+                        <span className="text-[11px] font-semibold text-slate-400 mt-1 font-mono">{props.currentTime}</span>
+                      </div>
+                    ) : isScanning ? (
+                      <div className="absolute inset-0 w-full h-full">
+                        <Scanner
+                          onScan={(result) => {
+                            if (result && result.length > 0) {
+                              props.handleScanSuccess(result[0].rawValue);
+                              setIsScanning(false);
+                            }
+                          }}
+                          onError={(err) => {
+                            console.error(err);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsScanning(false)}
+                          className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-slate-900/80 text-white font-bold text-[10px] uppercase tracking-wider cursor-pointer z-10 hover:bg-slate-900 transition-colors"
+                        >
+                          Matikan Kamera
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <svg className="w-10 h-10 text-[#94A3B8]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="3" y="3" width="6" height="6" rx="1.5" />
+                          <rect x="15" y="3" width="6" height="6" rx="1.5" />
+                          <rect x="3" y="15" width="6" height="6" rx="1.5" />
+                          <path d="M15 15h2v2h-2zm2 2h2v2h-2zm0-2h2v2h-2z" />
+                        </svg>
+                        <button
+                          type="button"
+                          onClick={() => setIsScanning(true)}
+                          className="mt-3 px-5 h-[36px] rounded-full bg-primary text-white hover:bg-primary-active font-sans font-bold text-[12px] uppercase tracking-[0.5px] cursor-pointer shadow-md transition-all active:scale-95"
+                        >
+                          Mulai Kamera Scan
+                        </button>
+                      </div>
                     )}
                   </div>
+
+                  {props.checkInError && (
+                    <div className="text-[11px] font-bold text-rose-500 bg-rose-50 border border-rose-100 rounded-xl p-3 text-left">
+                      {props.checkInError}
+                    </div>
+                  )}
 
                   {/* Action trigger button */}
                   <button
                     onClick={props.handleCheckIn}
-                    disabled={props.isCheckedIn}
+                    disabled={props.isCheckedIn || props.isSubmitting}
                     className={`w-full py-3.5 rounded-full font-bold text-[12px] uppercase tracking-[0.8px] transition-all active:scale-[0.98] cursor-pointer shadow-md ${
                       props.isCheckedIn 
                         ? "bg-slate-100 text-slate-400 cursor-default shadow-none border border-slate-200/60"
-                        : "bg-primary text-white hover:bg-primary-active shadow-primary/10 hover:shadow-primary/20"
+                        : "bg-[#F0F2FF] text-primary hover:bg-[#E0E4FF] shadow-none"
                     }`}
                   >
-                    {props.isCheckedIn ? "Success Check In" : "CHECK IN NOW"}
+                    {props.isCheckedIn ? "Success Check In" : props.isSubmitting ? "Memproses..." : "CHECK IN GPS (Tanpa Kamera)"}
                   </button>
                 </div>
 
@@ -278,7 +322,7 @@ export default function AbsenDesktop(props: AbsenProps) {
                     <div className="bg-[#F8FAFC] border border-slate-200/50 rounded-xl p-5 flex flex-col justify-between text-left h-[130px]">
                       <div className="flex items-center justify-between w-full">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" /> Today Attendances
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" /> On Time (Valid)
                         </span>
                       </div>
                       <div className="flex flex-col items-start gap-1 mt-2">
@@ -293,7 +337,7 @@ export default function AbsenDesktop(props: AbsenProps) {
                     <div className="bg-[#F8FAFC] border border-slate-200/50 rounded-xl p-5 flex flex-col justify-between text-left h-[130px]">
                       <div className="flex items-center justify-between w-full">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-red-500 rounded-full" /> Not Present
+                          <span className="w-1.5 h-1.5 bg-red-500 rounded-full" /> Late (Telat)
                         </span>
                       </div>
                       <div className="flex flex-col items-start gap-1 mt-2">
@@ -313,17 +357,23 @@ export default function AbsenDesktop(props: AbsenProps) {
           )}
 
           {/* TAB 2: HISTORY (Historical Stats and Log Table) */}
-          {activeTab === "history" && (
-            <div className="flex flex-col gap-6 w-full animate-in fade-in duration-300">
-              
-              {/* Stats overview banner */}
-              <div className="grid grid-cols-4 gap-6 w-full text-left">
-                {[
-                  { label: "Absensi Valid", val: "13 Hari", bg: "bg-emerald-50 text-emerald-600 border border-emerald-100", icon: <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /> },
-                  { label: "Terlambat", val: "2 Hari", bg: "bg-rose-50 text-rose-600 border border-rose-100", icon: <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /> },
-                  { label: "Luar Radius", val: "1 Hari", bg: "bg-amber-50 text-amber-600 border border-amber-100", icon: <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /> },
-                  { label: "Persentase Hadir", val: "93.8%", bg: "bg-gradient-to-br from-primary to-[#585E71] text-white", icon: <><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 11.517 1.397l-.041.02-.041.02a.75.75 0 01-.76-1.34l.041-.02a.75.75 0 01.203-.057z" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 9h1.5v9H9V9z" /></>, specialClass: "shadow-[0px_4px_12px_rgba(54,60,213,0.15)]" }
-                ].map((stat, i) => (
+          {activeTab === "history" && (() => {
+            const totalLogs = props.historyList.length;
+            const validLogs = props.historyList.filter(l => l.status === "valid").length;
+            const lateLogs = props.historyList.filter(l => l.status === "telat").length;
+            const presencePercent = totalLogs > 0 ? ((validLogs / totalLogs) * 100).toFixed(1) + "%" : "0%";
+
+            return (
+              <div className="flex flex-col gap-6 w-full animate-in fade-in duration-300">
+                
+                {/* Stats overview banner */}
+                <div className="grid grid-cols-4 gap-6 w-full text-left">
+                  {[
+                    { label: "Absensi Valid", val: `${validLogs} Hari`, bg: "bg-emerald-50 text-emerald-600 border border-emerald-100", icon: <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /> },
+                    { label: "Terlambat", val: `${lateLogs} Hari`, bg: "bg-rose-50 text-rose-600 border border-rose-100", icon: <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /> },
+                    { label: "Luar Radius", val: "0 Hari", bg: "bg-amber-50 text-amber-600 border border-amber-100", icon: <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /> },
+                    { label: "Persentase Hadir", val: presencePercent, bg: "bg-gradient-to-br from-primary to-[#585E71] text-white", icon: <><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 11.517 1.397l-.041.02-.041.02a.75.75 0 01-.76-1.34l.041-.02a.75.75 0 01.203-.057z" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 9h1.5v9H9V9z" /></>, specialClass: "shadow-[0px_4px_12px_rgba(54,60,213,0.15)]" }
+                  ].map((stat, i) => (
                   <div key={i} className={`border border-[#E5E7EB] rounded-[16px] p-5 flex items-center gap-4 shadow-[0px_1px_2px_rgba(0,0,0,0.02)] ${stat.bg.includes("gradient") ? stat.bg : "bg-white"} ${stat.specialClass || ""}`}>
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${stat.bg.includes("gradient") ? "bg-white/20 text-white" : stat.bg.split(" ")[0] + " " + stat.bg.split(" ")[1]}`}>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">{stat.icon}</svg>
@@ -388,10 +438,9 @@ export default function AbsenDesktop(props: AbsenProps) {
                           <td className="py-4 px-6">
                             <span className={`inline-flex items-center px-2.5 py-1 text-[10px] font-bold uppercase rounded-full border ${
                               item.status === "valid" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                              item.status === "luar_radius" ? "bg-orange-50 text-orange-600 border-orange-100" :
                               "bg-rose-50 text-rose-600 border-rose-100"
                             }`}>
-                              {item.status === "valid" ? "Valid" : item.status === "luar_radius" ? "Luar Radius" : "Telat"}
+                              {item.status === "valid" ? "Valid" : "Telat"}
                             </span>
                           </td>
                         </tr>
@@ -400,9 +449,9 @@ export default function AbsenDesktop(props: AbsenProps) {
                   </table>
                 </div>
               </div>
-
             </div>
-          )}
+          );
+        })()}
 
           {/* TAB 3: PROFILE SETTINGS */}
           {activeTab === "profile" && (
@@ -447,7 +496,7 @@ export default function AbsenDesktop(props: AbsenProps) {
                         <div className="relative">
                           <input
                             type="text"
-                            value="2200018001"
+                            value={props.studentNim}
                             disabled
                             className="w-full h-[44px] pl-4 pr-10 rounded-[12px] border border-slate-200/60 bg-slate-50 text-[14px] font-mono text-slate-400 font-semibold cursor-not-allowed select-none"
                           />
@@ -479,10 +528,10 @@ export default function AbsenDesktop(props: AbsenProps) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 w-full text-left">
                   {[
-                    { label: "Posko Penempatan", val: "Posko 1 - Yogyakarta" },
-                    { label: "Kelompok KKN", val: "Reguler 82 Unit A" },
-                    { label: "DPL (Pembimbing)", val: "Dr. Hartono, M.T." },
-                    { label: "Wilayah Tugas", val: "Danurejan, Kota Yogyakarta" }
+                    { label: "Posko Penempatan", val: "Posko Kel 8 Sungai Enam" },
+                    { label: "Kelompok KKN", val: "Kelompok KKN 8" },
+                    { label: "DPL (Pembimbing)", val: "Dian Kharisma Dewi, S.T.,M.T." },
+                    { label: "Wilayah Tugas", val: "Sungai Enam, Bintan, Kepri" }
                   ].map((meta, i) => (
                     <div key={i} className="flex flex-col gap-1 border border-slate-100 rounded-xl p-4 bg-slate-50/40">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{meta.label}</span>
