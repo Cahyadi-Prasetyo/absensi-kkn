@@ -494,19 +494,19 @@ export default function AdminQRPage() {
                       <span className="w-5.5 h-5.5 rounded-full bg-primary/10 text-primary font-extrabold text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">
                         1
                       </span>
-                      <span>Buka aplikasi **Kamera** di HP atau gunakan **Google Lens**.</span>
+                      <span>Buka browser di HP dan <strong>Login NIM</strong> ke website absensi KKN.</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="w-5.5 h-5.5 rounded-full bg-primary/10 text-primary font-extrabold text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">
                         2
                       </span>
-                      <span>Pindai QR Code di atas untuk menuju halaman `/absen`.</span>
+                      <span>Buka menu presensi, lalu tekan tombol <strong>📷 Scan QR Code</strong> di dalam website.</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="w-5.5 h-5.5 rounded-full bg-primary/10 text-primary font-extrabold text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">
                         3
                       </span>
-                      <span>Lakukan **Login NIM**, izinkan **GPS/Lokasi**, dan kirim kehadiran.</span>
+                      <span>Sorotkan kamera ke QR Code ini, izinkan akses <strong>GPS / Lokasi</strong>, lalu kirim kehadiran.</span>
                     </li>
                   </ol>
                 </div>
