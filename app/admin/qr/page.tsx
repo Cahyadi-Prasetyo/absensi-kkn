@@ -4,18 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-// Logo brand KKN (dua lingkaran bertumpuk transparan)
-function BrandLogo() {
-  return (
-    <div className="flex items-center gap-3 select-none">
-      <svg className="w-8 h-8 text-primary flex-shrink-0" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="16" r="10" fill="#363CD5" fillOpacity="0.85" />
-        <circle cx="20" cy="16" r="10" fill="#60A5FA" fillOpacity="0.75" />
-      </svg>
-      <span className="font-extrabold text-[20px] text-[#0F172A] tracking-tight">Portal KKN</span>
-    </div>
-  );
-}
+import BrandLogo from "@/app/components/BrandLogo";
 
 // Avatar helper
 function Avatar({ className = "w-8 h-8" }: { className?: string }) {

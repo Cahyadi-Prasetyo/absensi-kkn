@@ -23,6 +23,8 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+import ClientProviders from "./components/ClientProviders";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="id" className={`${plusJakartaSans.variable} h-full`}>
       <body className="min-h-full flex flex-col bg-[#F7F9FC] text-[#1B1B24] font-sans antialiased">
-        {children}
+        <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
   );

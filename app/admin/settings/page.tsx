@@ -10,18 +10,7 @@ const MapPicker = dynamic(() => import("./components/MapPicker"), {
   loading: () => <div className="w-full h-[280px] bg-slate-100 rounded-xl flex items-center justify-center text-[12px] font-bold text-slate-400 select-none animate-pulse">Memuat Peta...</div>,
 });
 
-// Logo brand KKN (dua lingkaran bertumpuk transparan)
-function BrandLogo() {
-  return (
-    <div className="flex items-center gap-3 select-none">
-      <svg className="w-8 h-8 text-primary flex-shrink-0" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="16" r="10" fill="#363CD5" fillOpacity="0.85" />
-        <circle cx="20" cy="16" r="10" fill="#60A5FA" fillOpacity="0.75" />
-      </svg>
-      <span className="font-extrabold text-[20px] text-[#0F172A] tracking-tight">Portal KKN</span>
-    </div>
-  );
-}
+import BrandLogo from "@/app/components/BrandLogo";
 
 // Avatar helper
 function Avatar({ className = "w-8 h-8" }: { className?: string }) {
@@ -515,6 +504,17 @@ export default function AdminSettingsPage() {
           </form>
         </main>
       </div>
+
+      {/* Toast Notification */}
+      {saveSuccess && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-2xl shadow-lg border backdrop-blur-md text-[13px] font-bold select-none bg-emerald-50/95 border-emerald-200 text-emerald-700">
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>Pengaturan posko berhasil disimpan!</span>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

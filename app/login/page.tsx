@@ -3,19 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { createEncryptedPassword, verifyPassword } from "@/lib/auth";
 
-// Logo brand KKN (dua lingkaran bertumpuk transparan)
-function BrandLogo() {
-  return (
-    <div className="flex items-center justify-center gap-2.5 select-none">
-      <svg className="w-10 h-10 text-primary flex-shrink-0" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="16" r="10" fill="#363CD5" fillOpacity="0.85" />
-        <circle cx="20" cy="16" r="10" fill="#60A5FA" fillOpacity="0.75" />
-      </svg>
-      <span className="font-extrabold text-[22px] text-[#0F172A] tracking-tight">Portal KKN</span>
-    </div>
-  );
-}
+import BrandLogo from "@/app/components/BrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -70,11 +60,21 @@ export default function LoginPage() {
         return;
       }
 
-      // Validate password (allow either the DB password or NIM itself)
-      if (data.password !== password && data.nim !== password) {
+      // Validate password using Hashing + Salt verification
+      const isPasswordCorrect = await verifyPassword(password, data.password) || (data.nim === password);
+      if (!isPasswordCorrect) {
         setErrorMessage("Kata sandi salah. Silakan coba lagi.");
         setIsLoading(false);
         return;
+      }
+
+      // Auto-Upgrade: If stored password is still plain text, automatically encrypt it with salt in Supabase DB!
+      if (data.password && !data.password.includes("$")) {
+        const encrypted = await createEncryptedPassword(password);
+        await supabase
+          .from("mahasiswa")
+          .update({ password: encrypted })
+          .eq("nim", inputNim);
       }
 
       // Check if logged in user is admin
@@ -114,9 +114,9 @@ export default function LoginPage() {
       <main className="w-full max-w-[420px] bg-white/80 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_0_rgba(15,23,42,0.04)] rounded-[28px] p-8 flex flex-col gap-6 relative z-10 transition-all duration-300 hover:shadow-[0_12px_40px_0_rgba(15,23,42,0.08)]">
         
         {/* Header Section */}
-        <header className="flex flex-col gap-2.5 text-center mt-2">
-          <BrandLogo />
-          <div className="flex flex-col gap-1 mt-2">
+        <header className="flex flex-col items-center justify-center gap-3 text-center mt-1">
+          <BrandLogo center={true} size="md" />
+          <div className="flex flex-col gap-1 mt-1 text-center">
             <h1 className="text-lg font-bold text-slate-900 tracking-tight">Selamat Datang Kembali</h1>
             <p className="text-[12px] text-slate-500 font-medium leading-relaxed">
               Masuk ke akun Anda untuk mencatat absensi atau memantau progres posko KKN.

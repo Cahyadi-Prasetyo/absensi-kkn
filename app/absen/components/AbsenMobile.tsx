@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import dynamic from "next/dynamic";
 
 const Scanner = dynamic(
   () => import("@yudiel/react-qr-scanner").then((mod) => mod.Scanner),
   { ssr: false }
 );
+
+import BrandLogo from "@/app/components/BrandLogo";
 
 // =========================================================================
 // TYPES & INTERFACES (Shared)
@@ -46,10 +48,24 @@ export interface AbsenProps {
   isSubmitting?: boolean;
   poskoLat: number;
   poskoLng: number;
+  absenBuka?: string;
+  absenTutup?: string;
+  fotoUrl?: string;
+  isUploadingAvatar?: boolean;
+  handleUploadAvatar?: (file: File) => void;
+  handleDeleteAvatar?: () => void;
+  setPreviewFotoUrl?: (url: string | null) => void;
 }
 
-// Shared Profile Vector Avatar
-function Avatar({ className = "w-10 h-10" }: { className?: string }) {
+// Shared Profile Avatar Component
+function Avatar({ className = "w-10 h-10", src }: { className?: string; src?: string }) {
+  if (src) {
+    return (
+      <div className={`${className} border border-slate-200/80 rounded-full overflow-hidden flex-shrink-0 bg-slate-100 select-none shadow-xs`}>
+        <img src={src} alt="Foto Profil" className="w-full h-full object-cover rounded-full" />
+      </div>
+    );
+  }
   return (
     <div className={`${className} border border-slate-200/80 rounded-full overflow-hidden flex-shrink-0 bg-[#DDE2F8] flex items-center justify-center select-none`}>
       <svg viewBox="0 0 100 100" className="w-full h-full object-cover" xmlns="http://www.w3.org/2000/svg">
@@ -68,34 +84,50 @@ function Avatar({ className = "w-10 h-10" }: { className?: string }) {
 export default function AbsenMobile(props: AbsenProps) {
   const [activeTab, setActiveTab] = useState<"home" | "history" | "profile">("home");
   const [isScanning, setIsScanning] = useState(false);
+  const mobileFileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="lg:hidden min-h-screen bg-[#F8FAFC] w-full flex flex-col relative font-sans antialiased text-slate-800 pb-[80px]">
       
-      {/* 1. MOBILE RADAR MAP HEADER */}
-      <div className="w-full h-[250px] bg-slate-950 relative overflow-hidden flex-shrink-0 flex items-center justify-center">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,#363CD5_0%,transparent_50%)] opacity-40" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,#1718BF_0%,transparent_60%)] opacity-35" />
+      {/* 1. MOBILE HERO LOGO HEADER */}
+      <div className="w-full h-[250px] bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#0F172A] relative overflow-hidden flex-shrink-0 flex items-center justify-center select-none">
         
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-[180px] h-[180px] rounded-full border border-white/5 flex items-center justify-center animate-[spin_40s_linear_infinite]" style={{ borderStyle: "dashed" }}>
-            <div className="w-[130px] h-[130px] rounded-full border border-primary/20 flex items-center justify-center">
-              <div className="w-[80px] h-[80px] rounded-full border border-primary/40 bg-primary/5 flex items-center justify-center relative">
-                <div className="w-2.5 h-2.5 bg-primary rounded-full" />
-                <div className="absolute w-2.5 h-2.5 bg-primary rounded-full animate-ping opacity-75" />
-              </div>
-            </div>
+        {/* Subtle Background Lighting & Mesh Patterns */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(54,60,213,0.4)_0%,transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(96,165,250,0.2)_0%,transparent_60%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:24px_24px] opacity-40" />
+
+        {/* Large Faded Watermark Logos in Background */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none scale-125 blur-[1px]">
+          <img src="/logo-kkn.webp" alt="Watermark KKN" className="h-44 w-auto object-contain" />
+          <img src="/logo-umrah.png" alt="Watermark UMRAH" className="h-44 w-auto object-contain ml-4" />
+        </div>
+
+        {/* Center Hero Emblem Badge with KKN & UMRAH Logos */}
+        <div className="relative z-10 flex flex-col items-center justify-center gap-2.5 pb-6">
+          <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+            <img src="/logo-kkn.webp" alt="Logo KKN" className="h-10 w-auto object-contain drop-shadow-md" />
+            <div className="h-7 w-[1px] bg-white/20" />
+            <img src="/logo-umrah.png" alt="Logo UMRAH" className="h-10 w-auto object-contain drop-shadow-md" />
           </div>
-          
-          <div className="absolute w-[200px] h-[1px] bg-white/10" />
-          <div className="absolute h-[200px] w-[1px] bg-white/10" />
-          
-          <div className="absolute top-6 left-6 font-mono text-[9px] text-white/30 tracking-wider">
-            {activeTab === "home" && "LOC: POSKO_KKN_SUNGAI_ENAM"}
-            {activeTab === "history" && "VIEW: ATTENDANCE_LOG"}
-            {activeTab === "profile" && "ACCOUNT: STUDENT_PROFILE"}
+
+          <div className="flex flex-col items-center text-center">
+            <span className="font-extrabold text-white text-base tracking-tight drop-shadow">
+              KKN Kelompok 8 Sungai Enam
+            </span>
+            <span className="text-[10px] font-bold text-blue-200/80 uppercase tracking-widest mt-0.5">
+              Universitas Maritim Raja Ali Haji
+            </span>
           </div>
-          <div className="absolute bottom-10 right-6 font-mono text-[9px] text-white/30 tracking-wider">LAT: {props.poskoLat ? props.poskoLat.toFixed(4) : "--"} / LON: {props.poskoLng ? props.poskoLng.toFixed(4) : "--"}</div>
+        </div>
+
+        {/* Header Metadata Chips */}
+        <div className="absolute top-4 left-5 font-mono text-[9px] font-semibold text-white/50 tracking-wider flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>POSKO ACTIVE</span>
+        </div>
+        <div className="absolute bottom-10 right-5 font-mono text-[9px] font-semibold text-white/50 tracking-wider">
+          LAT: {props.poskoLat ? props.poskoLat.toFixed(4) : "--"} / LON: {props.poskoLng ? props.poskoLng.toFixed(4) : "--"}
         </div>
       </div>
 
@@ -104,20 +136,23 @@ export default function AbsenMobile(props: AbsenProps) {
         <div className="w-full bg-white shadow-[0px_-4px_20px_rgba(0,0,0,0.03)] rounded-t-[32px] px-[20px] pt-[28px] pb-[32px] flex flex-col gap-[24px] flex-grow">
           
           {/* Header Greeting row */}
-          <header className="flex flex-row justify-between items-center w-full">
-            <div className="flex flex-col justify-center items-start">
-              <h1 className="font-sans font-bold text-[22px] leading-[30px] text-[#0F172A] tracking-tight">
+          <header className="flex flex-col gap-3 w-full">
+            <div className="flex flex-row justify-between items-center w-full">
+              <BrandLogo size="sm" />
+              <Avatar className="w-[42px] h-[42px]" />
+            </div>
+            <div className="flex flex-col justify-center items-start border-t border-slate-100 pt-2">
+              <h1 className="font-sans font-bold text-[20px] leading-[28px] text-[#0F172A] tracking-tight">
                 {activeTab === "home" && `Hey ${props.studentName.split(" ")[0]}`}
                 {activeTab === "history" && "Riwayat Absensi"}
                 {activeTab === "profile" && "Profil Pengguna"}
               </h1>
-              <p className="font-sans font-medium text-[13px] leading-[18px] text-slate-400 italic">
+              <p className="font-sans font-medium text-[12px] leading-[18px] text-slate-400 italic">
                 {activeTab === "home" && props.currentDate}
                 {activeTab === "history" && "Log aktivitas absensi KKN harian Anda"}
                 {activeTab === "profile" && "Informasi detail akun mahasiswa aktif KKN"}
               </p>
             </div>
-            <Avatar className="w-[48px] h-[48px]" />
           </header>
 
           {/* TAB 1: HOME (Mobile scan card & stats) */}
@@ -126,13 +161,18 @@ export default function AbsenMobile(props: AbsenProps) {
               
               {/* Check In scanner area */}
               <div className="bg-white border border-[#E5E7EB] shadow-[0px_1px_3px_rgba(0,0,0,0.02)] rounded-[24px] p-6 flex flex-col gap-6 w-full">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#E0E7FF] text-[#2D49F3] rounded-xl flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="3" y="4" width="18" height="12" rx="2" /><path d="M9 20h6" /><path d="M12 16v4" />
-                    </svg>
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#E0E7FF] text-[#2D49F3] rounded-xl flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="4" width="18" height="12" rx="2" /><path d="M9 20h6" /><path d="M12 16v4" />
+                      </svg>
+                    </div>
+                    <span className="font-bold text-[16px] text-slate-800 tracking-tight">Check In</span>
                   </div>
-                  <span className="font-bold text-[16px] text-slate-800 tracking-tight">Check In</span>
+                  <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200/80 flex items-center gap-1 font-mono">
+                    ⏰ {props.absenBuka || "06:00"} - {props.absenTutup || "08:00"}
+                  </span>
                 </div>
 
                 <div className="w-full aspect-video min-h-[220px] bg-[#F8FAFC] border-2 border-dashed border-[#CBD5E1] rounded-[16px] flex flex-col items-center justify-center gap-3 select-none overflow-hidden relative">
@@ -190,17 +230,14 @@ export default function AbsenMobile(props: AbsenProps) {
                   </div>
                 )}
 
-                <button
-                  onClick={props.handleCheckIn}
-                  disabled={props.isCheckedIn || props.isSubmitting}
-                  className={`flex flex-row justify-center items-center py-[12px] gap-[8px] w-full h-[44px] rounded-full font-sans font-bold text-[13px] tracking-[0.8px] uppercase select-none transition-all active:scale-[0.98] cursor-pointer ${
-                    props.isCheckedIn
-                      ? "bg-slate-100 text-slate-400 cursor-default"
-                      : "bg-[#F0F2FF] text-primary hover:bg-[#E0E4FF]"
-                  }`}
-                >
-                  <span>{props.isCheckedIn ? "DONE" : props.isSubmitting ? "Memproses..." : "Check In GPS (Tanpa Kamera)"}</span>
-                </button>
+                {props.isCheckedIn && (
+                  <div className="w-full py-2.5 rounded-full font-bold text-[12px] uppercase tracking-[0.8px] bg-emerald-50 text-emerald-600 border border-emerald-200 text-center flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>Sudah Check In Hari Ini</span>
+                  </div>
+                )}
+
+
               </div>
 
               {/* Employee Statistics Section (Synced with Desktop) */}
@@ -313,11 +350,22 @@ export default function AbsenMobile(props: AbsenProps) {
                     </div>
                   </div>
                   <div>
-                    <span className={`inline-flex items-center px-2.5 py-1 text-[11px] font-bold uppercase rounded-full border ${
-                      item.status === "valid" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                      "bg-rose-50 text-rose-600 border-rose-100"
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full border ${
+                      item.status === "valid"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : item.status === "telat"
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : item.status === "izin"
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
                     }`}>
-                      {item.status === "valid" ? "Valid" : "Telat"}
+                      {item.status === "valid"
+                        ? "Hadir"
+                        : item.status === "telat"
+                        ? "Terlambat"
+                        : item.status === "izin"
+                        ? "Izin"
+                        : "Sakit"}
                     </span>
                   </div>
                 </div>
@@ -334,12 +382,62 @@ export default function AbsenMobile(props: AbsenProps) {
                 <span className="font-bold text-[15px] text-slate-800 tracking-tight">Data Diri</span>
                 
                 <div className="flex flex-row items-center gap-4 border-b border-slate-100 pb-4">
-                  <div className="relative group w-16 h-16 rounded-full overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
-                    <Avatar className="w-full h-full" />
+                  <div className="relative group w-16 h-16 rounded-full overflow-hidden border-2 border-slate-200 bg-slate-50 flex items-center justify-center flex-shrink-0">
+                    <Avatar className="w-full h-full" src={props.fotoUrl} />
+                    <button
+                      type="button"
+                      onClick={() => mobileFileInputRef.current?.click()}
+                      disabled={props.isUploadingAvatar}
+                      className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[9px] font-bold transition-opacity cursor-pointer"
+                    >
+                      <span>Ganti</span>
+                    </button>
+                    <input
+                      type="file"
+                      ref={mobileFileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          props.handleUploadAvatar?.(e.target.files[0]);
+                        }
+                      }}
+                    />
                   </div>
                   <div className="flex flex-col text-left">
                     <span className="font-bold text-[14px] text-slate-700">{props.studentName}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{props.studentNim}</span>
+                    <span className="text-[10px] text-slate-400 font-mono mb-1.5">{props.studentNim}</span>
+                    
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => mobileFileInputRef.current?.click()}
+                        disabled={props.isUploadingAvatar}
+                        className="text-[11px] font-bold text-primary hover:underline text-left cursor-pointer"
+                      >
+                        {props.isUploadingAvatar ? "Mengunggah..." : "📷 Unggah Foto"}
+                      </button>
+
+                      {props.fotoUrl && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => props.setPreviewFotoUrl?.(props.fotoUrl || null)}
+                            className="text-[11px] font-bold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                          >
+                            👁️ Lihat
+                          </button>
+                          <button
+                            type="button"
+                            onClick={props.handleDeleteAvatar}
+                            disabled={props.isUploadingAvatar}
+                            className="text-[11px] font-bold text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                          >
+                            🗑️ Hapus
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { haversineDistance } from "@/lib/haversine";
+import { verifyPassword, createEncryptedPassword } from "@/lib/auth";
 import AbsenMobile, { HistoryItem } from "./components/AbsenMobile";
 import AbsenDesktop from "./components/AbsenDesktop";
 
@@ -100,30 +101,42 @@ function AbsenPageContent() {
   // Load posko settings dynamically from database or URL query params
   useEffect(() => {
     const loadSettings = async () => {
-      // 1. Fetch live settings from Supabase database (source of truth)
+      // 1. Fetch live settings from Supabase database (primary source of truth)
       const { data: dbSettings } = await supabase
         .from("settings")
         .select("*")
         .limit(1)
         .single();
 
-      // 2. Parse query parameters (e.g. from scanning QR code)
-      const urlLat = searchParams.get("lat");
-      const urlLng = searchParams.get("lng");
-      const urlRadius = searchParams.get("radius");
-      const urlBuka = searchParams.get("buka");
-      const urlTutup = searchParams.get("tutup");
+      if (dbSettings) {
+        setPoskoLat(Number(dbSettings.latitude));
+        setPoskoLng(Number(dbSettings.longitude));
+        setPoskoRadius(Number(dbSettings.radius));
+        setAbsenBuka(dbSettings.jam_buka);
+        setAbsenTutup(dbSettings.jam_tutup);
+      } else {
+        // 2. Parse query parameters if database settings not available
+        const urlLat = searchParams.get("lat");
+        const urlLng = searchParams.get("lng");
+        const urlRadius = searchParams.get("radius");
+        const urlBuka = searchParams.get("buka");
+        const urlTutup = searchParams.get("tutup");
 
-      // Use query parameters if present; otherwise fall back to database settings, or defaults
-      setPoskoLat(urlLat ? parseFloat(urlLat) : (dbSettings?.latitude || 0));
-      setPoskoLng(urlLng ? parseFloat(urlLng) : (dbSettings?.longitude || 0));
-      setPoskoRadius(urlRadius ? parseInt(urlRadius, 10) : (dbSettings?.radius || 300));
-      setAbsenBuka(urlBuka || dbSettings?.jam_buka || "06:00");
-      setAbsenTutup(urlTutup || dbSettings?.jam_tutup || "08:00");
+        if (urlLat && urlLng) {
+          setPoskoLat(parseFloat(urlLat));
+          setPoskoLng(parseFloat(urlLng));
+          if (urlRadius) setPoskoRadius(parseInt(urlRadius, 10));
+          if (urlBuka) setAbsenBuka(urlBuka);
+          if (urlTutup) setAbsenTutup(urlTutup);
+        }
+      }
     };
 
     loadSettings();
   }, [searchParams]);
+
+  const [fotoUrl, setFotoUrl] = useState("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -140,11 +153,95 @@ function AbsenPageContent() {
       }
       setStudentName(user.nama || "");
       setStudentNim(user.nim || "");
+      if (user.foto_url) setFotoUrl(user.foto_url);
       if (user.nim) {
         fetchHistory(user.nim);
       }
     }
   }, [fetchHistory, router]);
+
+  const updateMahasiswaFoto = async (url: string) => {
+    const { error } = await supabase
+      .from("mahasiswa")
+      .update({ foto_url: url })
+      .eq("nim", studentNim);
+
+    if (error) {
+      showToast("Gagal menyimpan foto ke database.", "error");
+    } else {
+      setFotoUrl(url);
+      const userJson = localStorage.getItem("kkn_user");
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        user.foto_url = url;
+        localStorage.setItem("kkn_user", JSON.stringify(user));
+      }
+      showToast("Foto profil berhasil diperbarui!", "success");
+    }
+    setIsUploadingAvatar(false);
+  };
+
+  const handleUploadAvatar = async (file: File) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("Ukuran foto maksimal 2MB!", "error");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${studentNim}_${Date.now()}.${fileExt}`;
+      const filePath = `profiles/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        // Fallback: Convert to Base64 data URL if bucket doesn't exist
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Url = reader.result as string;
+          await updateMahasiswaFoto(base64Url);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      await updateMahasiswaFoto(urlData.publicUrl);
+    } catch {
+      showToast("Gagal mengunggah foto profil. Coba lagi.", "error");
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const [previewFotoUrl, setPreviewFotoUrl] = useState<string | null>(null);
+
+  const handleDeleteAvatar = async () => {
+    setIsUploadingAvatar(true);
+    const { error } = await supabase
+      .from("mahasiswa")
+      .update({ foto_url: null })
+      .eq("nim", studentNim);
+
+    if (error) {
+      showToast("Gagal menghapus foto profil.", "error");
+    } else {
+      setFotoUrl("");
+      const userJson = localStorage.getItem("kkn_user");
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        delete user.foto_url;
+        localStorage.setItem("kkn_user", JSON.stringify(user));
+      }
+      showToast("Foto profil berhasil dihapus!", "success");
+    }
+    setIsUploadingAvatar(false);
+  };
+
+
 
   // Core check-in execution
   const executeCheckIn = async (
@@ -172,50 +269,92 @@ function AbsenPageContent() {
 
         // Check if within radius
         if (distance > targetRadius) {
-          setCheckInError(`Jarak Anda ${Math.round(distance)}m dari posko. Batas radius ${targetRadius}m.`);
+          setCheckInError(`Jarak Anda ${Math.round(distance)}m dari posko (target posko: ${targetLat.toFixed(5)}, ${targetLng.toFixed(5)}). Batas radius ${targetRadius}m.`);
           setIsSubmitting(false);
           return;
         }
 
-        // Check time window
+        // Strict Time Window Check (Block check-in outside targetBuka - targetTutup WIB)
         const nowTime = new Date();
         const [bukaH, bukaM] = targetBuka.split(":").map(Number);
         const [tutupH, tutupM] = targetTutup.split(":").map(Number);
-        const bukaMinutes = bukaH * 60 + bukaM;
-        const tutupMinutes = tutupH * 60 + tutupM;
-        const currentMinutes = nowTime.getHours() * 60 + nowTime.getMinutes();
+        const bukaMinutes = bukaH * 60 + (bukaM || 0);
+        let tutupMinutes = tutupH * 60 + (tutupM || 0);
 
-        let status: "valid" | "telat" = "valid";
-        if (currentMinutes < bukaMinutes || currentMinutes > tutupMinutes) {
-          if (currentMinutes > tutupMinutes) {
-            status = "telat";
-          } else {
-            setCheckInError(`Absensi hanya buka pukul ${targetBuka} - ${targetTutup} WIB.`);
-            setIsSubmitting(false);
-            return;
-          }
+        if ((tutupH === 0 && tutupM === 0) || tutupMinutes <= bukaMinutes) {
+          tutupMinutes += 24 * 60;
         }
 
-        // Insert into Supabase
-        const today = nowTime.toISOString().split("T")[0];
-        const { error } = await supabase.from("absensi").insert({
-          nim: studentNim,
-          tanggal: today,
-          waktu_submit: nowTime.toISOString(),
-          latitude: userLat,
-          longitude: userLng,
-          jarak_meter: distance,
-          status,
-        });
+        const currentMinutes = nowTime.getHours() * 60 + nowTime.getMinutes();
 
-        if (error) {
-          if (error.code === "23505") {
-            setCheckInError("Anda sudah absen hari ini.");
-          } else {
-            setCheckInError("Gagal mengirim absensi. Coba lagi.");
-          }
+        if (currentMinutes < bukaMinutes) {
+          setCheckInError(`Absensi belum dibuka. Sesi absensi dibuka pukul ${targetBuka} - ${targetTutup} WIB.`);
           setIsSubmitting(false);
           return;
+        }
+
+        if (currentMinutes > tutupMinutes) {
+          setCheckInError(`Absensi sudah ditutup! Sesi absensi hari ini berakhir pukul ${targetTutup} WIB.`);
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Status is valid (Hadir) since check-in is performed within the open-close time window configured by Admin
+        const status: "valid" | "telat" = "valid";
+
+        const today = nowTime.toISOString().split("T")[0];
+
+        // Check if student already has a record today
+        const { data: existingRec } = await supabase
+          .from("absensi")
+          .select("id")
+          .eq("nim", studentNim)
+          .eq("tanggal", today)
+          .maybeSingle();
+
+        let dbError = null;
+
+        if (existingRec) {
+          const { error: err } = await supabase
+            .from("absensi")
+            .update({
+              waktu_submit: nowTime.toISOString(),
+              latitude: userLat,
+              longitude: userLng,
+              jarak_meter: distance,
+              status: status,
+            })
+            .eq("id", existingRec.id);
+          dbError = err;
+        } else {
+          const { error: err } = await supabase.from("absensi").insert({
+            nim: studentNim,
+            tanggal: today,
+            waktu_submit: nowTime.toISOString(),
+            latitude: userLat,
+            longitude: userLng,
+            jarak_meter: distance,
+            status: status,
+          });
+          dbError = err;
+        }
+
+        if (dbError) {
+          setCheckInError("Gagal mengirim absensi. Coba lagi.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Clean permit map leftover if any
+        try {
+          const permitMapStr = localStorage.getItem("kkn_permit_map");
+          if (permitMapStr) {
+            const permitMap = JSON.parse(permitMapStr);
+            delete permitMap[`${studentNim}_${today}`];
+            localStorage.setItem("kkn_permit_map", JSON.stringify(permitMap));
+          }
+        } catch (e) {
+          console.error(e);
         }
 
         // Success
@@ -241,9 +380,30 @@ function AbsenPageContent() {
     );
   };
 
-  // Button check-in handler using URL query parameters
-  const handleCheckIn = () => {
-    executeCheckIn(poskoLat, poskoLng, poskoRadius, absenBuka, absenTutup);
+  // Button check-in handler using URL query parameters or fresh DB settings
+  const handleCheckIn = async () => {
+    // Fetch live settings directly from Supabase DB to ensure freshest coordinates
+    const { data: dbSettings } = await supabase
+      .from("settings")
+      .select("*")
+      .limit(1)
+      .single();
+
+    const targetLat = dbSettings ? Number(dbSettings.latitude) : poskoLat;
+    const targetLng = dbSettings ? Number(dbSettings.longitude) : poskoLng;
+    const targetRadius = dbSettings ? Number(dbSettings.radius) : poskoRadius;
+    const targetBuka = dbSettings ? dbSettings.jam_buka : absenBuka;
+    const targetTutup = dbSettings ? dbSettings.jam_tutup : absenTutup;
+
+    if (dbSettings) {
+      setPoskoLat(Number(dbSettings.latitude));
+      setPoskoLng(Number(dbSettings.longitude));
+      setPoskoRadius(Number(dbSettings.radius));
+      setAbsenBuka(dbSettings.jam_buka);
+      setAbsenTutup(dbSettings.jam_tutup);
+    }
+
+    executeCheckIn(targetLat, targetLng, targetRadius, targetBuka, targetTutup);
   };
 
   // Camera QR scanner scan success handler
@@ -252,18 +412,24 @@ function AbsenPageContent() {
       console.log("Scanned QR Code URL:", qrData);
       const url = new URL(qrData);
 
-      // Fetch live settings from Supabase as fallback
+      const urlLat = url.searchParams.get("lat");
+      const urlLng = url.searchParams.get("lng");
+      const urlRadius = url.searchParams.get("radius");
+      const urlBuka = url.searchParams.get("buka");
+      const urlTutup = url.searchParams.get("tutup");
+
+      // Fetch live settings from Supabase
       const { data: dbSettings } = await supabase
         .from("settings")
         .select("*")
         .limit(1)
         .single();
 
-      const lat = parseFloat(url.searchParams.get("lat") || String(dbSettings?.latitude || 0));
-      const lng = parseFloat(url.searchParams.get("lng") || String(dbSettings?.longitude || 0));
-      const radius = parseInt(url.searchParams.get("radius") || String(dbSettings?.radius || 300), 10);
-      const buka = url.searchParams.get("buka") || dbSettings?.jam_buka || "06:00";
-      const tutup = url.searchParams.get("tutup") || dbSettings?.jam_tutup || "08:00";
+      const lat = dbSettings ? Number(dbSettings.latitude) : (urlLat ? parseFloat(urlLat) : poskoLat);
+      const lng = dbSettings ? Number(dbSettings.longitude) : (urlLng ? parseFloat(urlLng) : poskoLng);
+      const radius = dbSettings ? Number(dbSettings.radius) : (urlRadius ? parseInt(urlRadius, 10) : poskoRadius);
+      const buka = dbSettings ? dbSettings.jam_buka : (urlBuka || absenBuka);
+      const tutup = dbSettings ? dbSettings.jam_tutup : (urlTutup || absenTutup);
 
       await executeCheckIn(lat, lng, radius, buka, tutup);
     } catch {
@@ -287,22 +453,29 @@ function AbsenPageContent() {
       return;
     }
 
-    // Verify old password
+    // Verify old password with hash+salt support
     const { data } = await supabase
       .from("mahasiswa")
       .select("password")
       .eq("nim", studentNim)
       .single();
 
-    if (!data || data.password !== oldPassword) {
+    if (!data) {
       showToast("Password lama salah!", "error");
       return;
     }
 
-    // Update password
+    const isOldPasswordValid = await verifyPassword(oldPassword, data.password);
+    if (!isOldPasswordValid) {
+      showToast("Password lama salah!", "error");
+      return;
+    }
+
+    // Encrypt new password with salt before storing
+    const encryptedNewPassword = await createEncryptedPassword(newPassword);
     await supabase
       .from("mahasiswa")
-      .update({ password: newPassword })
+      .update({ password: encryptedNewPassword })
       .eq("nim", studentNim);
 
     showToast("Password berhasil diubah!", "success");
@@ -372,6 +545,13 @@ function AbsenPageContent() {
     isSubmitting,
     poskoLat,
     poskoLng,
+    absenBuka,
+    absenTutup,
+    fotoUrl,
+    isUploadingAvatar,
+    handleUploadAvatar,
+    handleDeleteAvatar,
+    setPreviewFotoUrl,
   };
 
   return (
@@ -532,6 +712,41 @@ function AbsenPageContent() {
               Simpan Sandi Baru
             </button>
           </form>
+        </div>
+      )}
+
+
+
+      {/* Lightbox Preview Foto Profil */}
+      {previewFotoUrl && (
+        <div className="fixed inset-0 bg-[#0F172A]/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="relative flex flex-col items-center gap-4 max-w-sm w-full bg-slate-900 border border-slate-700/80 p-5 rounded-[28px] shadow-2xl select-none">
+            <button
+              type="button"
+              onClick={() => setPreviewFotoUrl(null)}
+              className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-all cursor-pointer z-10"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="w-full aspect-square rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-white/10 shadow-inner mt-2">
+              <img src={previewFotoUrl} alt="Preview Foto Profil" className="w-full h-full object-cover" />
+            </div>
+            <div className="flex items-center justify-between w-full px-1">
+              <div className="flex flex-col text-left">
+                <span className="text-[13px] font-bold text-white">{studentName}</span>
+                <span className="text-[10px] font-mono text-slate-400">{studentNim}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewFotoUrl(null)}
+                className="px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

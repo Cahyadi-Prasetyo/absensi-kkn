@@ -7,21 +7,17 @@ const Scanner = dynamic(
   { ssr: false }
 );
 
-// Logo brand mirip HoomanRD (dua lingkaran bertumpuk transparan)
-function BrandLogo() {
-  return (
-    <div className="flex items-center gap-3 select-none">
-      <svg className="w-8 h-8 text-primary flex-shrink-0" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="16" r="10" fill="#363CD5" fillOpacity="0.85" />
-        <circle cx="20" cy="16" r="10" fill="#60A5FA" fillOpacity="0.75" />
-      </svg>
-      <span className="font-extrabold text-[20px] text-[#0F172A] tracking-tight">Portal Absensi</span>
-    </div>
-  );
-}
+import BrandLogo from "@/app/components/BrandLogo";
 
 // Avatar helper
-function Avatar({ className = "w-8 h-8" }: { className?: string }) {
+function Avatar({ className = "w-8 h-8", src }: { className?: string; src?: string }) {
+  if (src) {
+    return (
+      <div className={`${className} border border-slate-200/80 rounded-full overflow-hidden flex-shrink-0 bg-slate-100 select-none shadow-xs`}>
+        <img src={src} alt="Foto Profil" className="w-full h-full object-cover rounded-full" />
+      </div>
+    );
+  }
   return (
     <div className={`${className} border border-slate-200/80 rounded-full overflow-hidden flex-shrink-0 bg-[#DDE2F8] flex items-center justify-center select-none`}>
       <svg viewBox="0 0 100 100" className="w-full h-full object-cover" xmlns="http://www.w3.org/2000/svg">
@@ -40,6 +36,7 @@ function Avatar({ className = "w-8 h-8" }: { className?: string }) {
 export default function AbsenDesktop(props: AbsenProps) {
   const [activeTab, setActiveTab] = useState<"home" | "history" | "profile">("home");
   const [isScanning, setIsScanning] = useState(false);
+  const desktopFileInputRef = React.useRef<HTMLInputElement>(null);
   
   // Local filter states for history tab
   const [searchQuery, setSearchQuery] = useState("");
@@ -143,7 +140,7 @@ export default function AbsenDesktop(props: AbsenProps) {
         {/* Profile Card Summary at Bottom */}
         <div className="flex flex-col gap-4 border-t border-[#E5E7EB] pt-4 select-none">
           <div className="flex items-center gap-3">
-            <Avatar className="w-9 h-9" />
+            <Avatar className="w-9 h-9" src={props.fotoUrl} />
             <div className="flex flex-col text-left">
               <span className="font-bold text-[13px] text-slate-800 leading-tight">{props.studentName}</span>
               <span className="text-[11px] text-slate-400">@mahasiswa</span>
@@ -190,13 +187,18 @@ export default function AbsenDesktop(props: AbsenProps) {
                 
                 {/* Left Side: Clean Check In card (Exact design layout) */}
                 <div className="col-span-5 bg-white border border-slate-200/60 shadow-[0px_4px_20px_rgba(0,0,0,0.02)] rounded-[24px] p-6 flex flex-col gap-5 justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-[44px] h-[44px] bg-[#EFF6FF] text-[#2D49F3] rounded-full flex items-center justify-center flex-shrink-0">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="3" y="3" width="18" height="12" rx="2" /><path d="M7 21h10" /><path d="M12 15v6" />
-                      </svg>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-[#E0E7FF] text-[#2D49F3] rounded-xl flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="3" y="3" width="18" height="12" rx="2" /><path d="M7 21h10" /><path d="M12 15v6" />
+                        </svg>
+                      </div>
+                      <span className="font-bold text-[16px] text-slate-800 tracking-tight">Check In</span>
                     </div>
-                    <span className="font-bold text-[16px] text-slate-800 tracking-tight">Check In</span>
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/80 flex items-center gap-1 font-mono">
+                      ⏰ {props.absenBuka || "06:00"} - {props.absenTutup || "08:00"} WIB
+                    </span>
                   </div>
                              {/* Clean scanner target area */}
                   <div className="w-full aspect-[4/3] bg-[#F8FAFC] border-2 border-dashed border-slate-200 rounded-[20px] flex flex-col items-center justify-center gap-3 select-none p-4 overflow-hidden relative">
@@ -256,18 +258,14 @@ export default function AbsenDesktop(props: AbsenProps) {
                     </div>
                   )}
 
-                  {/* Action trigger button */}
-                  <button
-                    onClick={props.handleCheckIn}
-                    disabled={props.isCheckedIn || props.isSubmitting}
-                    className={`w-full py-3.5 rounded-full font-bold text-[12px] uppercase tracking-[0.8px] transition-all active:scale-[0.98] cursor-pointer shadow-md ${
-                      props.isCheckedIn 
-                        ? "bg-slate-100 text-slate-400 cursor-default shadow-none border border-slate-200/60"
-                        : "bg-[#F0F2FF] text-primary hover:bg-[#E0E4FF] shadow-none"
-                    }`}
-                  >
-                    {props.isCheckedIn ? "Success Check In" : props.isSubmitting ? "Memproses..." : "CHECK IN GPS (Tanpa Kamera)"}
-                  </button>
+                  {props.isCheckedIn && (
+                    <div className="w-full py-3 rounded-full font-bold text-[12px] uppercase tracking-[0.8px] bg-emerald-50 text-emerald-600 border border-emerald-200 text-center flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <span>Sudah Check In Hari Ini</span>
+                    </div>
+                  )}
+
+
                 </div>
 
                 {/* Right Side: Employee Statistics (Functional 7days/30days/All filter) */}
@@ -436,11 +434,31 @@ export default function AbsenDesktop(props: AbsenProps) {
                           <td className="py-4 px-6">{item.time}</td>
                           <td className="py-4 px-6 font-mono text-[11px] text-slate-400">{item.distance}</td>
                           <td className="py-4 px-6">
-                            <span className={`inline-flex items-center px-2.5 py-1 text-[10px] font-bold uppercase rounded-full border ${
-                              item.status === "valid" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                              "bg-rose-50 text-rose-600 border-rose-100"
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full border ${
+                              item.status === "valid"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : item.status === "telat"
+                                ? "bg-rose-50 text-rose-700 border-rose-200"
+                                : item.status === "izin"
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
                             }`}>
-                              {item.status === "valid" ? "Valid" : "Telat"}
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                item.status === "valid"
+                                  ? "bg-emerald-500"
+                                  : item.status === "telat"
+                                  ? "bg-rose-500"
+                                  : item.status === "izin"
+                                  ? "bg-blue-500"
+                                  : "bg-amber-500"
+                              }`} />
+                              {item.status === "valid"
+                                ? "Hadir"
+                                : item.status === "telat"
+                                ? "Terlambat"
+                                : item.status === "izin"
+                                ? "Izin"
+                                : "Sakit"}
                             </span>
                           </td>
                         </tr>
@@ -467,13 +485,57 @@ export default function AbsenDesktop(props: AbsenProps) {
                 <div className="flex flex-col md:flex-row gap-8 items-start">
                   {/* Left avatar edit display */}
                   <div className="flex flex-col items-center gap-3 select-none flex-shrink-0">
-                    <div className="relative group w-20 h-20 rounded-full overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center cursor-pointer">
-                      <Avatar className="w-full h-full" />
+                    <div
+                      onClick={() => desktopFileInputRef.current?.click()}
+                      className="relative group w-20 h-20 rounded-full overflow-hidden border-2 border-slate-200 bg-slate-50 flex items-center justify-center cursor-pointer shadow-xs"
+                    >
+                      <Avatar className="w-full h-full" src={props.fotoUrl} />
                       <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center text-[10px] text-white font-bold">
-                        Ganti Foto
+                        {props.isUploadingAvatar ? "Mengunggah..." : "Ganti Foto"}
                       </div>
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">PNG / JPG maks 2MB</span>
+                    <input
+                      type="file"
+                      ref={desktopFileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          props.handleUploadAvatar?.(e.target.files[0]);
+                        }
+                      }}
+                    />
+                    <div className="flex flex-col items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => desktopFileInputRef.current?.click()}
+                        disabled={props.isUploadingAvatar}
+                        className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                      >
+                        {props.isUploadingAvatar ? "Mengunggah..." : "📷 Unggah Foto"}
+                      </button>
+
+                      {props.fotoUrl && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => props.setPreviewFotoUrl?.(props.fotoUrl || null)}
+                            className="text-[10px] font-bold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                          >
+                            👁️ Lihat
+                          </button>
+                          <span className="text-slate-300 text-[10px]">•</span>
+                          <button
+                            type="button"
+                            onClick={props.handleDeleteAvatar}
+                            disabled={props.isUploadingAvatar}
+                            className="text-[10px] font-bold text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                          >
+                            🗑️ Hapus
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Right Input Fields Form */}
