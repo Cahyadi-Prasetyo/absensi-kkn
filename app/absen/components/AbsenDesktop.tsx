@@ -143,7 +143,7 @@ export default function AbsenDesktop(props: AbsenProps) {
             <Avatar className="w-9 h-9" src={props.fotoUrl} />
             <div className="flex flex-col text-left">
               <span className="font-bold text-[13px] text-slate-800 leading-tight">{props.studentName}</span>
-              <span className="text-[11px] text-slate-400">@mahasiswa</span>
+              <span className="text-[11px] text-slate-400 font-mono">{props.studentNim}</span>
             </div>
           </div>
           <button
