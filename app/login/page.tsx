@@ -61,7 +61,7 @@ export default function LoginPage() {
       }
 
       // Validate password using Hashing + Salt verification
-      const isPasswordCorrect = await verifyPassword(password, data.password) || (data.nim === password);
+      const isPasswordCorrect = await verifyPassword(password, data.password);
       if (!isPasswordCorrect) {
         setErrorMessage("Kata sandi salah. Silakan coba lagi.");
         setIsLoading(false);

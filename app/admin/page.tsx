@@ -346,10 +346,7 @@ export default function AdminDashboard() {
       matchesStatus = log.status === "telat";
     }
     
-    const logTime = new Date(log.date).getTime();
-    const start = startDate ? new Date(startDate).getTime() : 0;
-    const end = endDate ? new Date(endDate).getTime() + 86399999 : Infinity;
-    const matchesDate = logTime >= start && logTime <= end;
+    const matchesDate = (!startDate || log.date >= startDate) && (!endDate || log.date <= endDate);
     
     return matchesSearch && matchesStatus && matchesDate;
   });
@@ -367,13 +364,19 @@ export default function AdminDashboard() {
 
   // Export Excel
   const handleExportExcel = () => {
+    const parseLocalDate = (dateStr: string) => {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      return new Date(y, (m || 1) - 1, d || 1);
+    };
+
     // 1. Get dates in range
     const getDatesInRange = (startStr: string, endStr: string) => {
+      if (!startStr || !endStr) return [];
       const dates: string[] = [];
-      let current = new Date(startStr);
-      const end = new Date(endStr);
+      let current = parseLocalDate(startStr);
+      const end = parseLocalDate(endStr);
       let safetyCap = 0;
-      while (current <= end && safetyCap < 60) {
+      while (current <= end && safetyCap < 366) {
         const yyyy = current.getFullYear();
         const mm = String(current.getMonth() + 1).padStart(2, "0");
         const dd = String(current.getDate()).padStart(2, "0");
@@ -387,7 +390,7 @@ export default function AdminDashboard() {
 
     // 2. Format header date labels (e.g. "18 Jul")
     const formatHeaderDate = (dateStr: string) => {
-      const d = new Date(dateStr);
+      const d = parseLocalDate(dateStr);
       const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
       return `${d.getDate()} ${months[d.getMonth()]}`;
     };
@@ -395,9 +398,10 @@ export default function AdminDashboard() {
 
     const tableHeaders = ["NIM", "Nama", ...dateHeaders, "Total Hadir", "% Kehadiran"];
 
-    // 3. Build student list from logs (unique students)
+    // 3. Build student list from current logs (limited by pageSize if not All)
+    const exportSourceLogs = pageSize >= 999999 ? filteredLogs : paginatedLogs;
     const studentMap = new Map<string, { nim: string; name: string }>();
-    logs.forEach(l => {
+    exportSourceLogs.forEach(l => {
       if (!studentMap.has(l.nim)) {
         studentMap.set(l.nim, { nim: l.nim, name: l.name });
       }
@@ -415,7 +419,7 @@ export default function AdminDashboard() {
       let attendedCount = 0;
       
       const dateCellsHtml = rangeDates.map(targetDate => {
-        const logEntry = logs.find(l => l.nim === student.nim && l.date === targetDate);
+        const logEntry = exportSourceLogs.find(l => l.nim === student.nim && l.date === targetDate);
         if (logEntry) {
           attendedCount++;
           return `<td style="color: #10B981; font-weight: bold; text-align: center;">✓ ${logEntry.time}</td>`;
@@ -428,10 +432,10 @@ export default function AdminDashboard() {
 
       return `
         <tr>
-          <td style="mso-number-format:'\\\\@';">${student.nim}</td>
+          <td style="mso-number-format:'@';">${student.nim}</td>
           <td style="font-weight: bold;">${student.name}</td>
           ${dateCellsHtml}
-          <td style="text-align: center; font-weight: bold;">${attendedCount}/${totalDays}</td>
+          <td style="mso-number-format:'@'; text-align: center; font-weight: bold;">${attendedCount} / ${totalDays}</td>
           <td style="text-align: center; font-weight: bold; color: #312E81;">${pct}%</td>
         </tr>
       `;
@@ -705,6 +709,8 @@ export default function AdminDashboard() {
                     <option value={10}>10</option>
                     <option value={15}>15</option>
                     <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={999999}>All</option>
                   </select>
                   <span className="text-slate-400">from {totalItems} data</span>
                 </div>

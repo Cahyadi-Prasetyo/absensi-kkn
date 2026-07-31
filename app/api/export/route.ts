@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     const total = dates.length || 1;
     const pct = Math.round((count / total) * 100);
-    return `<tr><td style="mso-number-format:'\\@';">${student.nim}</td><td style="font-weight: bold;">${student.nama}</td>${cells}<td style="text-align: center; font-weight: bold;">${count}/${total}</td><td style="text-align: center; font-weight: bold; color: #312E81;">${pct}%</td></tr>`;
+    return `<tr><td style="mso-number-format:'@';">${student.nim}</td><td style="font-weight: bold;">${student.nama}</td>${cells}<td style="mso-number-format:'@'; text-align: center; font-weight: bold;">${count} / ${total}</td><td style="text-align: center; font-weight: bold; color: #312E81;">${pct}%</td></tr>`;
   }).join("");
 
   const excelHtml = `

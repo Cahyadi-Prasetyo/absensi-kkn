@@ -473,10 +473,29 @@ function AbsenPageContent() {
 
     // Encrypt new password with salt before storing
     const encryptedNewPassword = await createEncryptedPassword(newPassword);
-    await supabase
+    const { error: updateError } = await supabase
       .from("mahasiswa")
       .update({ password: encryptedNewPassword })
       .eq("nim", studentNim);
+
+    if (updateError) {
+      console.error("Password update error:", updateError);
+      showToast("Gagal memperbarui password. Silakan coba lagi.", "error");
+      return;
+    }
+
+    // Verify the update actually persisted
+    const { data: verifyData } = await supabase
+      .from("mahasiswa")
+      .select("password")
+      .eq("nim", studentNim)
+      .single();
+
+    if (!verifyData || verifyData.password !== encryptedNewPassword) {
+      console.error("Password verification failed - update did not persist");
+      showToast("Password gagal tersimpan. Periksa koneksi atau hubungi Admin.", "error");
+      return;
+    }
 
     showToast("Password berhasil diubah!", "success");
     setOldPassword("");
