@@ -18,7 +18,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    // Use WIB (UTC+7) to determine today's date
+    const nowWIB = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const today = `${nowWIB.getUTCFullYear()}-${String(nowWIB.getUTCMonth() + 1).padStart(2, "0")}-${String(nowWIB.getUTCDate()).padStart(2, "0")}`;
 
     const { data, error } = await supabase.from("absensi").insert({
       nim,

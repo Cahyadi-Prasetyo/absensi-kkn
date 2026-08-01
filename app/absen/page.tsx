@@ -83,8 +83,9 @@ function AbsenPageContent() {
       });
       setHistoryList(items);
 
-      // Check if already checked in today
-      const today = new Date().toISOString().split("T")[0];
+      // Check if already checked in today (use local date, NOT UTC)
+      const nowLocal = new Date();
+      const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
       const todayEntry = data.find((r) => r.tanggal === today);
       if (todayEntry) {
         setIsCheckedIn(true);
@@ -302,7 +303,7 @@ function AbsenPageContent() {
         // Status is valid (Hadir) since check-in is performed within the open-close time window configured by Admin
         const status: "valid" | "telat" = "valid";
 
-        const today = nowTime.toISOString().split("T")[0];
+        const today = `${nowTime.getFullYear()}-${String(nowTime.getMonth() + 1).padStart(2, "0")}-${String(nowTime.getDate()).padStart(2, "0")}`;
 
         // Check if student already has a record today
         const { data: existingRec } = await supabase
