@@ -236,8 +236,8 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState("All");
   
   // Custom range filter dates
-  const [startDate, setStartDate] = useState("2026-05-01");
-  const [endDate, setEndDate] = useState("2026-12-31");
+  const [startDate, setStartDate] = useState("2026-08-01");
+  const [endDate, setEndDate] = useState("2026-08-31");
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
